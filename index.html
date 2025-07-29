@@ -1,0 +1,861 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>相机角度测量仪 - 问题解决方案</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- PWA 元数据 -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1d3557">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📐</text></svg>">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        :root {
+            --primary: #4361ee;
+            --secondary: #3f37c9;
+            --success: #4cc9f0;
+            --warning: #ffaa00;
+            --danger: #f72585;
+            --dark: #1d3557;
+            --light: #f8f9fa;
+            --gray: #6c757d;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1d3557 0%, #457b9d 100%);
+            color: white;
+            min-height: 100vh;
+            overflow: auto;
+        }
+        
+        .container {
+            max-width: 100%;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            gap: 20px;
+        }
+        
+        header {
+            text-align: center;
+            padding: 25px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 20px;
+            margin-bottom: 10px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        }
+        
+        h1 {
+            font-size: 2.2rem;
+            margin-bottom: 10px;
+            background: linear-gradient(to right, #4cc9f0, #90e0ef);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .subtitle {
+            font-size: 1.1rem;
+            opacity: 0.9;
+            margin-top: 10px;
+            color: #a8dadc;
+        }
+        
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .camera-section {
+            position: relative;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+            background: #000;
+            aspect-ratio: 4/3;
+        }
+        
+        #cameraPreview {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+        
+        #overlayCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+        }
+        
+        .camera-placeholder {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            background: linear-gradient(45deg, #1a2a6c, #2c3e50);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .camera-placeholder i {
+            font-size: 5rem;
+            margin-bottom: 20px;
+            color: #f72585;
+        }
+        
+        .camera-placeholder h2 {
+            font-size: 1.8rem;
+            margin-bottom: 15px;
+            color: #ffaa00;
+        }
+        
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+        }
+        
+        button {
+            padding: 18px 12px;
+            border: none;
+            border-radius: 15px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        button i {
+            font-size: 1.6rem;
+        }
+        
+        button:hover {
+            background: rgba(255, 255, 255, 0.25);
+            transform: translateY(-3px);
+        }
+        
+        button:active {
+            transform: translateY(1px);
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        #measureBtn {
+            background: linear-gradient(45deg, #4cc9f0, #4895ef);
+        }
+        
+        #clearBtn {
+            background: linear-gradient(45deg, #f72585, #b5179e);
+        }
+        
+        #flipBtn {
+            background: linear-gradient(45deg, #7209b7, #560bad);
+        }
+        
+        .status-panel {
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 20px;
+            padding: 25px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .panel-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid rgba(76, 201, 240, 0.3);
+        }
+        
+        .panel-header i {
+            font-size: 1.8rem;
+            margin-right: 15px;
+            color: #4cc9f0;
+        }
+        
+        .panel-title {
+            font-size: 1.6rem;
+            font-weight: bold;
+        }
+        
+        .status-content {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
+        }
+        
+        .status-item {
+            display: flex;
+            align-items: flex-start;
+            padding: 15px;
+            background: rgba(29, 53, 87, 0.6);
+            border-radius: 15px;
+            border-left: 4px solid;
+        }
+        
+        .status-item.success {
+            border-left-color: #4cc9f0;
+        }
+        
+        .status-item.warning {
+            border-left-color: #ffaa00;
+        }
+        
+        .status-item.danger {
+            border-left-color: #f72585;
+        }
+        
+        .status-icon {
+            font-size: 1.8rem;
+            margin-right: 15px;
+            min-width: 30px;
+        }
+        
+        .status-text {
+            flex: 1;
+        }
+        
+        .status-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+        
+        .status-desc {
+            font-size: 1rem;
+            line-height: 1.5;
+            color: #e9ecef;
+        }
+        
+        .solution-list {
+            margin-top: 20px;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 15px;
+            border: 2px dashed #ffaa00;
+        }
+        
+        .solution-list h3 {
+            color: #ffaa00;
+            margin-bottom: 15px;
+            font-size: 1.4rem;
+        }
+        
+        .solution-list ol {
+            padding-left: 25px;
+        }
+        
+        .solution-list li {
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+            line-height: 1.6;
+        }
+        
+        .solution-list li strong {
+            color: #4cc9f0;
+        }
+        
+        .instruction {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 20px;
+            border-radius: 20px;
+            margin-top: 10px;
+            backdrop-filter: blur(5px);
+            border: 2px solid rgba(76, 201, 240, 0.5);
+        }
+        
+        .instruction h3 {
+            color: #90e0ef;
+            margin-bottom: 15px;
+            font-size: 1.4rem;
+        }
+        
+        .instruction ol {
+            padding-left: 25px;
+        }
+        
+        .instruction li {
+            margin-bottom: 12px;
+            font-size: 1.1rem;
+            line-height: 1.5;
+        }
+        
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .feature-card {
+            background: rgba(29, 53, 87, 0.7);
+            border-radius: 15px;
+            padding: 20px;
+            border: 1px solid rgba(76, 201, 240, 0.3);
+            transition: transform 0.3s;
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-5px);
+            border-color: #4cc9f0;
+        }
+        
+        .feature-card i {
+            font-size: 2.5rem;
+            color: #4cc9f0;
+            margin-bottom: 15px;
+        }
+        
+        .feature-card h4 {
+            font-size: 1.3rem;
+            margin-bottom: 10px;
+            color: #90e0ef;
+        }
+        
+        .feature-card p {
+            color: #e9ecef;
+            line-height: 1.6;
+        }
+        
+        /* PWA安装提示 */
+        #installContainer {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.85);
+            border-radius: 15px;
+            padding: 15px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 5px 25px rgba(0, 0, 0, 0.4);
+            display: none;
+            z-index: 1000;
+            max-width: 300px;
+            border: 2px solid var(--success);
+        }
+        
+        #installContainer.show {
+            display: block;
+            animation: slideIn 0.5s ease-out;
+        }
+        
+        @keyframes slideIn {
+            from { transform: translateY(100px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        
+        #installContainer .header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        #installContainer .header i {
+            font-size: 2rem;
+            color: var(--success);
+            margin-right: 10px;
+        }
+        
+        #installContainer .header h3 {
+            color: var(--success);
+            font-size: 1.2rem;
+        }
+        
+        #installContainer p {
+            margin-bottom: 15px;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+        
+        #installContainer .buttons {
+            display: flex;
+            gap: 10px;
+        }
+        
+        #installContainer button {
+            flex: 1;
+            padding: 10px;
+            font-size: 1rem;
+            border-radius: 12px;
+        }
+        
+        #installBtn {
+            background: linear-gradient(45deg, var(--success), #3a86ff);
+        }
+        
+        #dismissBtn {
+            background: rgba(255, 255, 255, 0.15);
+        }
+        
+        /* 安装步骤 */
+        .pwa-steps {
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 20px;
+            padding: 20px;
+            margin-top: 20px;
+            border: 2px solid var(--warning);
+        }
+        
+        .pwa-steps h3 {
+            color: var(--warning);
+            margin-bottom: 15px;
+            font-size: 1.4rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .pwa-steps .step {
+            display: flex;
+            margin-bottom: 15px;
+            align-items: flex-start;
+        }
+        
+        .pwa-steps .step-number {
+            background: var(--warning);
+            color: #1d3557;
+            font-weight: bold;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+            flex-shrink: 0;
+        }
+        
+        .pwa-steps .step-content {
+            flex: 1;
+        }
+        
+        .pwa-steps .step-content h4 {
+            margin-bottom: 5px;
+            color: #ffd166;
+        }
+        
+        /* 响应式调整 */
+        @media (max-width: 768px) {
+            .controls {
+                grid-template-columns: 1fr;
+            }
+            
+            .feature-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .panel-title {
+                font-size: 1.4rem;
+            }
+            
+            h1 {
+                font-size: 1.8rem;
+            }
+            
+            #installContainer {
+                left: 20px;
+                right: 20px;
+                max-width: none;
+                bottom: 10px;
+            }
+        }
+        
+        footer {
+            text-align: center;
+            padding: 20px;
+            color: #a8dadc;
+            font-size: 0.9rem;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-camera"></i> 相机角度测量仪</h1>
+            <div class="subtitle">使用手机相机测量真实世界中的角度 | 支持安装为手机App</div>
+        </header>
+        
+        <div class="app-container">
+            <div class="camera-section" id="cameraContainer">
+                <video id="cameraPreview" autoplay playsinline></video>
+                <canvas id="overlayCanvas"></canvas>
+                
+                <div class="camera-placeholder" id="cameraPlaceholder">
+                    <i class="fas fa-camera-slash"></i>
+                    <h2>相机无法加载</h2>
+                    <p>请查看下方解决方案解决此问题</p>
+                </div>
+            </div>
+            
+            <div class="controls">
+                <button id="flipBtn" disabled>
+                    <i class="fas fa-sync-alt"></i>
+                    <span>翻转相机</span>
+                </button>
+                <button id="measureBtn" disabled>
+                    <i class="fas fa-play-circle"></i>
+                    <span>开始测量</span>
+                </button>
+                <button id="clearBtn" disabled>
+                    <i class="fas fa-eraser"></i>
+                    <span>清除标记</span>
+                </button>
+            </div>
+            
+            <div class="status-panel">
+                <div class="panel-header">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <div class="panel-title">相机问题诊断</div>
+                </div>
+                
+                <div class="status-content">
+                    <div class="status-item danger">
+                        <div class="status-icon">
+                            <i class="fas fa-ban"></i>
+                        </div>
+                        <div class="status-text">
+                            <div class="status-title">安全上下文问题</div>
+                            <div class="status-desc">
+                                浏览器要求通过HTTPS或localhost访问相机API。当前运行在：<span id="protocolDisplay">file://</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="status-item warning">
+                        <div class="status-icon">
+                            <i class="fas fa-lock"></i>
+                        </div>
+                        <div class="status-text">
+                            <div class="status-title">权限被拒绝</div>
+                            <div class="status-desc">
+                                用户未授予相机访问权限或浏览器阻止了权限请求
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="status-item warning">
+                        <div class="status-icon">
+                            <i class="fas fa-mobile-alt"></i>
+                        </div>
+                        <div class="status-text">
+                            <div class="status-title">设备兼容性问题</div>
+                            <div class="status-desc">
+                                您的设备或浏览器可能不支持所需API，或没有可用摄像头
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="status-item success">
+                        <div class="status-icon">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                        <div class="status-text">
+                            <div class="status-title">API支持检测</div>
+                            <div class="status-desc">
+                                您的浏览器支持：<span id="apiSupport">getUserMedia API</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="solution-list">
+                    <h3><i class="fas fa-tools"></i> 解决方案：</h3>
+                    <ol>
+                        <li><strong>使用HTTPS协议</strong>：将应用部署在HTTPS服务器上，或使用localhost开发环境</li>
+                        <li><strong>授予相机权限</strong>：检查浏览器地址栏中的相机权限图标并允许访问</li>
+                        <li><strong>检查物理设备</strong>：确保设备有可用的摄像头且未被其他应用占用</li>
+                        <li><strong>更新浏览器</strong>：使用最新版本的Chrome、Firefox或Edge浏览器</li>
+                        <li><strong>检查安全设置</strong>：禁用可能阻止相机访问的浏览器扩展或防火墙</li>
+                        <li><strong>设备兼容性</strong>：确保设备具有可用的摄像头并支持媒体API</li>
+                    </ol>
+                </div>
+            </div>
+            
+            <div class="instruction">
+                <h3><i class="fas fa-book"></i> 应用使用指南</h3>
+                <ol>
+                    <li>解决相机问题后，点击"开始测量"按钮</li>
+                    <li>在屏幕上依次标记三个点：顶点 → 第一条边端点 → 第二条边端点</li>
+                    <li>应用将自动计算并显示角度值</li>
+                    <li>使用"清除标记"按钮重置测量</li>
+                    <li>使用"翻转相机"按钮在前置和后置摄像头间切换</li>
+                </ol>
+            </div>
+            
+            <!-- 新增PWA安装指南 -->
+            <div class="pwa-steps">
+                <h3><i class="fas fa-mobile-alt"></i> 安装为手机App</h3>
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <h4>Android设备</h4>
+                        <p>点击浏览器菜单 → 选择"安装应用" → 确认安装</p>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <h4>iOS设备</h4>
+                        <p>点击分享按钮 → 选择"添加到主屏幕" → 点击"添加"</p>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <h4>桌面设备</h4>
+                        <p>在浏览器地址栏中查找安装图标 → 点击"安装"按钮</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <i class="fas fa-ruler-combined"></i>
+                    <h4>精确角度测量</h4>
+                    <p>使用向量数学计算角度，精度可达0.1度，满足工程和教学需求</p>
+                </div>
+                
+                <div class="feature-card">
+                    <i class="fas fa-drafting-compass"></i>
+                    <h4>实时视觉反馈</h4>
+                    <p>标记点、连接线和角度弧线提供直观的视觉反馈</p>
+                </div>
+                
+                <div class="feature-card">
+                    <i class="fas fa-mobile"></i>
+                    <h4>移动设备优化</h4>
+                    <p>专为手机和平板设计，响应式界面适配各种屏幕尺寸</p>
+                </div>
+            </div>
+        </div>
+        
+        <footer>
+            <p>相机角度测量仪 v1.0 | 基于WebRTC技术 | 支持PWA安装</p>
+            <p>注意：此应用必须在HTTPS环境或localhost中运行才能访问相机</p>
+        </footer>
+    </div>
+    
+    <!-- PWA安装提示容器 -->
+    <div id="installContainer">
+        <div class="header">
+            <i class="fas fa-download"></i>
+            <h3>安装相机角度测量仪</h3>
+        </div>
+        <p>将此应用安装到您的设备，获得原生应用体验，支持离线使用！</p>
+        <div class="buttons">
+            <button id="dismissBtn">稍后</button>
+            <button id="installBtn">立即安装</button>
+        </div>
+    </div>
+
+    <script>
+        // 获取DOM元素
+        const cameraPreview = document.getElementById('cameraPreview');
+        const cameraContainer = document.getElementById('cameraContainer');
+        const cameraPlaceholder = document.getElementById('cameraPlaceholder');
+        const protocolDisplay = document.getElementById('protocolDisplay');
+        const apiSupport = document.getElementById('apiSupport');
+        
+        // 显示当前协议
+        protocolDisplay.textContent = window.location.protocol + '//' + window.location.host;
+        
+        // 检测API支持
+        const mediaSupport = !!navigator.mediaDevices && !!navigator.mediaDevices.getUserMedia;
+        apiSupport.textContent = mediaSupport ? 
+            "getUserMedia API (支持)" : 
+            "getUserMedia API (不支持)";
+        
+        // 初始化相机
+        async function initCamera() {
+            if (!mediaSupport) {
+                showErrorState("您的浏览器不支持相机访问API");
+                return;
+            }
+            
+            try {
+                // 尝试访问相机
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: "environment" } 
+                });
+                
+                // 成功获取相机访问权限
+                cameraPreview.srcObject = stream;
+                cameraPlaceholder.style.display = 'none';
+                
+                // 更新UI
+                document.getElementById('flipBtn').disabled = false;
+                document.getElementById('measureBtn').disabled = false;
+                document.getElementById('clearBtn').disabled = false;
+                
+            } catch (err) {
+                // 处理错误
+                console.error("相机访问错误:", err);
+                showErrorState(getErrorMessage(err));
+            }
+        }
+        
+        // 显示错误状态
+        function showErrorState(message) {
+            cameraPlaceholder.innerHTML = `
+                <i class="fas fa-exclamation-triangle"></i>
+                <h2>相机加载失败</h2>
+                <p>${message}</p>
+                <div style="margin-top:20px;color:#ffaa00;">
+                    <i class="fas fa-info-circle"></i> 请查看下方解决方案
+                </div>
+            `;
+            cameraPlaceholder.style.display = 'flex';
+            
+            // 添加重试按钮
+            const retryBtn = document.createElement('button');
+            retryBtn.innerHTML = '<i class="fas fa-redo"></i> 重试相机连接';
+            retryBtn.style.background = 'linear-gradient(45deg, #ffaa00, #ff6b00)';
+            retryBtn.style.marginTop = '20px';
+            retryBtn.style.width = '80%';
+            retryBtn.style.padding = '15px';
+            retryBtn.onclick = initCamera;
+            cameraPlaceholder.appendChild(retryBtn);
+        }
+        
+        // 获取友好的错误信息
+        function getErrorMessage(error) {
+            switch(error.name) {
+                case 'NotAllowedError':
+                    return "相机访问权限被拒绝。请在浏览器设置中允许相机访问。";
+                case 'NotFoundError':
+                    return "未找到可用的摄像头设备。";
+                case 'NotReadableError':
+                    return "摄像头设备已被占用或无法访问。";
+                case 'OverconstrainedError':
+                    return "无法满足摄像头配置要求。";
+                case 'SecurityError':
+                    return "安全限制阻止了相机访问。请使用HTTPS协议。";
+                case 'TypeError':
+                    return "无效的约束参数。";
+                default:
+                    return "未知错误: " + error.message;
+            }
+        }
+        
+        // 尝试初始化相机
+        initCamera();
+        
+        // ================== PWA功能实现 ==================
+        // 安装提示元素
+        const installContainer = document.getElementById('installContainer');
+        const installBtn = document.getElementById('installBtn');
+        const dismissBtn = document.getElementById('dismissBtn');
+        
+        // 用于存储安装事件
+        let deferredPrompt;
+        
+        // 监听安装事件
+        window.addEventListener('beforeinstallprompt', (e) => {
+            // 阻止默认安装提示
+            e.preventDefault();
+            // 存储事件以便稍后触发
+            deferredPrompt = e;
+            // 显示自定义安装提示
+            installContainer.classList.add('show');
+        });
+        
+        // 安装按钮点击事件
+        installBtn.addEventListener('click', async () => {
+            if (deferredPrompt) {
+                // 显示安装提示
+                deferredPrompt.prompt();
+                // 等待用户选择
+                const { outcome } = await deferredPrompt.userChoice;
+                // 无论用户选择如何，都隐藏安装提示
+                installContainer.classList.remove('show');
+                // 清除事件引用
+                deferredPrompt = null;
+            }
+        });
+        
+        // 关闭按钮点击事件
+        dismissBtn.addEventListener('click', () => {
+            installContainer.classList.remove('show');
+        });
+        
+        // 监听应用安装成功事件
+        window.addEventListener('appinstalled', () => {
+            console.log('应用已成功安装');
+            installContainer.classList.remove('show');
+        });
+        
+        // 检查是否是PWA模式
+        if (window.matchMedia('(display-mode: standalone)').matches) {
+            console.log('当前以PWA模式运行');
+        }
+        
+        // ================== 创建虚拟manifest ==================
+        // 由于我们无法实际创建manifest.json文件，这里使用JavaScript动态创建
+        function createDynamicManifest() {
+            const manifest = {
+                "name": "相机角度测量仪",
+                "short_name": "角度测量",
+                "description": "使用手机相机测量真实世界中的角度",
+                "start_url": ".",
+                "display": "standalone",
+                "background_color": "#1d3557",
+                "theme_color": "#1d3557",
+                "icons": [
+                    {
+                        "src": "icon-192x192.png",
+                        "sizes": "192x192",
+                        "type": "image/png"
+                    },
+                    {
+                        "src": "icon-512x512.png",
+                        "sizes": "512x512",
+                        "type": "image/png"
+                    }
+                ]
+            };
+            
+            // 创建manifest链接
+            const manifestStr = JSON.stringify(manifest);
+            const blob = new Blob([manifestStr], {type: 'application/json'});
+            const manifestURL = URL.createObjectURL(blob);
+            
+            // 更新页面中的manifest链接
+            document.querySelector('link[rel="manifest"]').href = manifestURL;
+        }
+        
+        // 调用函数创建manifest
+        createDynamicManifest();
+    </script>
+</body>
+</html>
